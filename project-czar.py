@@ -6,7 +6,9 @@ import os.path
 import sys
 
 import pathlib
+import json
 
+import datetime
 
 
 
@@ -93,8 +95,21 @@ def cmd_stop(txt):
     linkf.unlink()
     
 
-def addlog(cmd,notes):
-    tell("Loggin ", cmd, *notes)
+def addlog(ev,notes):
+    ( curdir, curprj, linkf ) = get_dirs()
+    pf = curdir + "/project-czar.txt"
+    txt = open(pf).read()
+    if txt == "":
+        txt = "[]"
+    orig = json.loads(txt)
+    orig.insert(0, { 'event' : ev,
+                     'time'  : datetime.datetime.utcnow().isoformat(),
+                     'notes' : notes,
+    })
+    with open(pf,'w') as out:
+        json.dump(orig,out,ensure_ascii=False, indent=2,sort_keys = True)
+
+    
 ###
 
 if len(sys.argv) < 2 :
