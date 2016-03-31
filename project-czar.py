@@ -9,12 +9,12 @@ import pathlib
 import json
 
 import datetime
+import uuid
 
 
 
 def tell(*args):
-    print("echo",
-          *["'%s'"%x for x in args],';')
+    print( *["%s"%x for x in args],';')
 
 
 def get_prjdir():
@@ -79,7 +79,7 @@ def cmd_help():
     tell(".     t,task -- add a task to do")
     tell(".     l,list -- list tasks")
     tell(".     d,done -- mark # task done")
-    tell(".     n,note -- edit notes of active task")
+    tell(".     n,note -- add note to # task")
 
 
         
@@ -93,18 +93,81 @@ def cmd_stop(txt):
     addlog('stop',txt)
     linkf = pathlib.Path.home()/'.project-czar'
     linkf.unlink()
+
+def cmd_task(txt):
+    verify_projectdir()
+    addlog('task',txt)
+
+    
+def cmd_list():
+    verify_projectdir()
+    (ts,note)  = get_open_tass()
+    ts.reverse()
+    idx = 1
+    for t in ts:
+        print(idx,' -- ', ' '.join(t["notes"]))
+        if t["uuid"] in note:
+            for n in note[t["uuid"]]:
+                print("        ",' '.join(n["notes"]))
+        idx = idx + 1
+        
+def cmd_done(idx,txt):
+    verify_projectdir()
+    (ts, note) = get_open_tass()
+    ts.reverse()
+    task_uuid = ts[idx-1]["uuid"]
+    addlog('done',txt,{ 'task_uuid' : task_uuid})
+
+def cmd_note(idx,txt):
+    verify_projectdir()
+    (ts, note) = get_open_tass()
+    ts.reverse()
+    task_uuid = ts[idx-1]["uuid"]
+    addlog('note',txt,{ 'task_uuid' : task_uuid})
     
 
-def addlog(ev,notes):
+    
+def get_open_tass():
+    orig = readjson()
+    tasks = []
+    done = set()
+    note = {}    
+    for t in  orig:
+        if t["event"] == "done":
+            done.add(t["task_uuid"])
+        elif t["event"] == "task" and t["uuid"] not in done:
+            tasks.append(t)
+        elif t["event"] == "note" and t["uuid"] not in done:
+            if t["task_uuid"] not in note:
+                note[t["task_uuid"]] = []
+            note[t["task_uuid"]].append(t)            
+
+    return (tasks,note)
+    
+
+
+def readjson():
     ( curdir, curprj, linkf ) = get_dirs()
     pf = curdir + "/project-czar.txt"
     txt = open(pf).read()
     if txt == "":
         txt = "[]"
     orig = json.loads(txt)
-    orig.insert(0, { 'event' : ev,
+    return orig
+
+
+def addlog(ev,notes, add = {}):
+    ( curdir, curprj, linkf ) = get_dirs()
+    pf = curdir + "/project-czar.txt"
+    txt = open(pf).read()
+    if txt == "":
+        txt = "[]"
+    orig = json.loads(txt)
+    orig.insert(0, { 'uuid' : str(uuid.uuid4()),
+                     'event' : ev,
                      'time'  : datetime.datetime.utcnow().isoformat(),
                      'notes' : notes,
+                     **add,
     })
     with open(pf,'w') as out:
         json.dump(orig,out,ensure_ascii=False, indent=2,sort_keys = True)
@@ -120,6 +183,14 @@ elif sys.argv[1] in ( '+', 'start' ) :
     cmd_start(sys.argv[2:])
 elif sys.argv[1] in ( '-', 'stop' ) :
     cmd_stop(sys.argv[2:])
+elif sys.argv[1] in ( 't', 'task' ) :
+    cmd_task(sys.argv[2:])
+elif sys.argv[1] in ( 'l', 'list' ) :
+    cmd_list()
+elif sys.argv[1] in ( 'd', 'done' ) :
+    cmd_done(int(sys.argv[2]),sys.argv[3:])
+elif sys.argv[1] in ( 'n', 'note' ) :
+    cmd_note(int(sys.argv[2]),sys.argv[3:])
 else:
     cmd_help()
 
