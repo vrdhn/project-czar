@@ -179,15 +179,18 @@ class ProjectCzar:
     def cmd_list(self):
         showprj = self.which_project()
         if showprj:
-            (tasks, notes) = self.get_open_task(showprj)
-            tasks.reverse()
-            idx = 1
-            for t in tasks:
-                print(idx, ' -- ', ' '.join(t["notes"]))
-                if t["uuid"] in notes:
-                    for n in notes[t["uuid"]]:
-                        print("        ", ' '.join(n["notes"]))
-                idx = idx + 1
+            self.aux_list(showprj)
+
+    def aux_list(self,prj):
+        (tasks, notes) = self.get_open_task(prj)
+        tasks.reverse()
+        idx = 1
+        for t in tasks:
+            print('[',idx,']', ' '.join(t["notes"]),'.')
+            if t["uuid"] in notes:
+                for n in notes[t["uuid"]]:
+                    print("    +   ", ' '.join(n["notes"]),'.')
+            idx = idx + 1
 
     def cmd_done(self, idx, txt):
         showprj = self.which_project()
@@ -234,9 +237,13 @@ class ProjectCzar:
             tell("**ERROR No active project")
 
     def cmd_info(self):
-        self.which_project()
+        prj = self.which_project()
+        tell("Active Project: ", prj["project_directory"])
 
-
+    def cmd_pending(self):
+        for x in self.listprjjson:
+            tell("===> ",x["project_directory"])
+            self.aux_list(x)
 
 
 ################################################################################
@@ -261,8 +268,6 @@ def cmd_help():
 
 pc = ProjectCzar()
 
-#elif sys.argv[1] in ( 'p', 'pend','pending' ) :
-#    cmd_pending('/data/Projects')
 
 if len(sys.argv) < 2:
     pc.cmd_info()
@@ -282,6 +287,8 @@ elif sys.argv[1] in ('a', 'add'):
     pc.cmd_add(os.getcwd())
 elif sys.argv[1] in ('l', 'list'):
     pc.cmd_list()
+elif sys.argv[1] in ( 'p', 'pend','pending' ) :
+    pc.cmd_pending()
 else:
     cmd_help()
 
