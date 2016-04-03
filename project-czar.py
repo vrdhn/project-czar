@@ -37,17 +37,18 @@ import uuid
 #     ]
 #"""
 
-class color:
-   PURPLE = '\033[95m'
-   CYAN = '\033[96m'
-   DARKCYAN = '\033[36m'
-   BLUE = '\033[94m'
-   GREEN = '\033[92m'
-   YELLOW = '\033[93m'
-   RED = '\033[91m'
-   BOLD = '\033[1m'
-   UNDERLINE = '\033[4m'
-   END = '\033[0m'
+class Color:
+    """ Just some colors for vt100 """
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
 
 
 class ProjectCzar:
@@ -102,19 +103,19 @@ class ProjectCzar:
 
     def is_path_below(self, root, below):
         """ /a, /a/* => True, /a, /b => False"""
-        r = os.path.relpath(below, root)
-        if r == '.':
+        partial_path = os.path.relpath(below, root)
+        if partial_path == '.':
             return True
-        if r[0] == '.':
+        if partial_path[0] == '.':
             return False
         return True
 
     def lookup_project_by_dir(self, indir):
         """indir can be a sub-dir of prjdir too !!"""
         prjs = []
-        for p in self.listprjjson:
-            if self.is_path_below(p["project_directory"], indir):
-                prjs.append(p)
+        for idxp in self.listprjjson:
+            if self.is_path_below(idxp["project_directory"], indir):
+                prjs.append(idxp)
         if len(prjs) == 0:
             return None
         if len(prjs) == 1:
@@ -124,34 +125,37 @@ class ProjectCzar:
         sys.exit(1)
 
     def get_open_task(self, prj):
+        """ get open tasks and note """
         orig = self.load(prj["project_uuid"], {})
         tasks = []
         done = set()
         note = {}
-        for t in  orig:
-            if t["event"] == "done":
-                done.add(t["task_uuid"])
-            elif t["event"] == "task" and t["uuid"] not in done:
-                tasks.append(t)
-            elif t["event"] == "note" and t["uuid"] not in done:
-                if t["task_uuid"] not in note:
-                    note[t["task_uuid"]] = []
-                note[t["task_uuid"]].append(t)
+        for idxt in  orig:
+            if idxt["event"] == "done":
+                done.add(idxt["task_uuid"])
+            elif idxt["event"] == "task" and idxt["uuid"] not in done:
+                tasks.append(idxt)
+            elif idxt["event"] == "note" and idxt["uuid"] not in done:
+                if idxt["task_uuid"] not in note:
+                    note[idxt["task_uuid"]] = []
+                note[idxt["task_uuid"]].append(idxt)
 
         return (tasks, note)
 
-    def addlog(self, prj, ev, notes, add=None):
+    def addlog(self, prj, evt, notes, add=None):
+        """ Add a event-log to project file"""
         obj = self.load(prj["project_uuid"], [])
         if not add:
             add = {}
         obj.insert(0, {'uuid' : str(uuid.uuid4()),
-                       'event' : ev,
+                       'event' : evt,
                        'time'  : datetime.datetime.utcnow().isoformat(),
                        'notes' : notes,
                        **add})
         self.save(prj["project_uuid"], obj)
 
     def which_project(self):
+        """ which project .. active or current TODO: this needs fixing"""
         prjdir = self.project_of_directory()
         curprj = self.current_project()
         if prjdir is None:
@@ -190,22 +194,25 @@ class ProjectCzar:
             self.save(newid, [])
 
     def cmd_list(self):
+        """ list the tasks and notes """
         showprj = self.which_project()
         if showprj:
             self.aux_list(showprj)
 
-    def aux_list(self,prj,indent=''):
+    def aux_list(self, prj, indent=''):
+        """ print tasks and notes"""
         (tasks, notes) = self.get_open_task(prj)
         tasks.reverse()
         idx = 1
-        for t in tasks:
-            print(indent,'[%d]'%idx, ' '.join(t["notes"]),'.')
-            if t["uuid"] in notes:
-                for n in notes[t["uuid"]]:
-                    print(indent,"  + ", ' '.join(n["notes"]),'.')
+        for idxt in tasks:
+            print(indent, '[%d]'%idx, ' '.join(idxt["notes"]), '.')
+            if idxt["uuid"] in notes:
+                for idxn in notes[idxt["uuid"]]:
+                    print(indent, "  + ", ' '.join(idxn["notes"]), '.')
             idx = idx + 1
 
     def cmd_done(self, idx, txt):
+        """ mark a task done """
         showprj = self.which_project()
         if showprj:
             tasks = self.get_open_task(showprj)[0]
@@ -214,6 +221,7 @@ class ProjectCzar:
             self.addlog(showprj, 'done', txt, {'task_uuid' : task_uuid})
 
     def cmd_note(self, idx, txt):
+        """ add note to task """
         showprj = self.which_project()
         if showprj:
             tasks = self.get_open_task(showprj)[0]
@@ -222,11 +230,13 @@ class ProjectCzar:
             self.addlog(showprj, 'note', txt, {'task_uuid' : task_uuid})
 
     def cmd_task(self, txt):
+        """ add task to project """
         showprj = self.which_project()
         if showprj:
             self.addlog(showprj, 'task', txt)
 
     def cmd_start(self, txt):
+        """ clock-in a project """
         prjdir = self.project_of_directory()
         if prjdir is None:
             tell("**ERROR: Not in a project directory")
@@ -242,6 +252,7 @@ class ProjectCzar:
         self.addlog(prjdir, 'start', txt)
 
     def cmd_stop(self, txt):
+        """ clock-out a project """
         curprj = self.current_project()
         if curprj:
             self.save("current", {})
@@ -250,64 +261,72 @@ class ProjectCzar:
             tell("**ERROR No active project")
 
     def cmd_info(self):
+        """ some info """
         prj = self.which_project()
         if prj:
             tell("Active Project: ", prj["project_directory"])
+            self.aux_list(prj, '')
 
     def cmd_pending(self):
-        for x in self.listprjjson:
-            tell(">",color.BOLD,
-                 os.path.basename(x["project_directory"]),
-                 color.END)
-            self.aux_list(x,'   ')
+        """ pending list .. tasks/notes of all projects"""
+        for idxp in self.listprjjson:
+            tell(">", Color.BOLD,
+                 os.path.basename(idxp["project_directory"]),
+                 Color.END)
+            self.aux_list(idxp, '   ')
 
 
 ################################################################################
 
 def tell(*args):
+    """ just a tell """
     print(*["%s"%x for x in args])
 
 def cmd_help():
+    """ help ..."""
     tell(". Project - Czar Usage:")
-    tell(".     i         -- info ")
-    tell(".     a,add     -- add a project to czar ")
-    tell(".     +,start   -- start clock")
-    tell(".     -,stop    -- stop clock")
-    tell(".     t,task    -- add a task to do")
-    tell(".     l,list    -- list tasks")
-    tell(".     d,done    -- mark \# task done")
-    tell(".     n,note    -- add note to \# task")
-    tell(".     p,pending -- show tasks of all projects")
+    tell(".     i                  -- info ")
+    tell(".     a,add              -- add a project to czar ")
+    tell(".     +,start <txt>      -- start clock")
+    tell(".     -,stop  <txt>      -- stop clock")
+    tell(".     t,task  <txt>      -- add a task to do")
+    tell(".     l,list             -- list tasks")
+    tell(".     d,done  <d> <txt>  -- mark  task done")
+    tell(".     n,note  <d> <txt>  -- add note to  task")
+    tell(".     p,pending          -- show tasks of all projects")
 
 ###
 
 
-pc = ProjectCzar()
+def main():
+    """ just main """
+    curprj = ProjectCzar()
+
+    if len(sys.argv) < 2:
+        curprj.cmd_info()
+    elif sys.argv[1] in ('i', 'info'):
+        curprj.cmd_info()
+    elif sys.argv[1] in ('d', 'done'):
+        curprj.cmd_done(int(sys.argv[2]), sys.argv[3:])
+    elif sys.argv[1] in ('t', 'task'):
+        curprj.cmd_task(sys.argv[2:])
+    elif sys.argv[1] in ('-', 'stop'):
+        curprj.cmd_stop(sys.argv[2:])
+    elif sys.argv[1] in ('+', 'start'):
+        curprj.cmd_start(sys.argv[2:])
+    elif sys.argv[1] in ('n', 'note'):
+        curprj.cmd_note(int(sys.argv[2]), sys.argv[3:])
+    elif sys.argv[1] in ('a', 'add'):
+        curprj.cmd_add(os.getcwd())
+    elif sys.argv[1] in ('l', 'list'):
+        curprj.cmd_list()
+    elif sys.argv[1] in ('p', 'pend', 'pending'):
+        curprj.cmd_pending()
+    else:
+        cmd_help()
 
 
-if len(sys.argv) < 2:
-    pc.cmd_info()
-elif sys.argv[1] in ('i', 'info'):
-    pc.cmd_info()
-elif sys.argv[1] in ('d', 'done'):
-    pc.cmd_done(int(sys.argv[2]), sys.argv[3:])
-elif sys.argv[1] in ('t', 'task'):
-    pc.cmd_task(sys.argv[2:])
-elif sys.argv[1] in ('-', 'stop'):
-    pc.cmd_stop(sys.argv[2:])
-elif sys.argv[1] in ('+', 'start'):
-    pc.cmd_start(sys.argv[2:])
-elif sys.argv[1] in ('n', 'note'):
-    pc.cmd_note(int(sys.argv[2]), sys.argv[3:])
-elif sys.argv[1] in ('a', 'add'):
-    pc.cmd_add(os.getcwd())
-elif sys.argv[1] in ('l', 'list'):
-    pc.cmd_list()
-elif sys.argv[1] in ( 'p', 'pend','pending' ) :
-    pc.cmd_pending()
-else:
-    cmd_help()
-
+main()
 ## End
 
 
