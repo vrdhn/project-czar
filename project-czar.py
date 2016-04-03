@@ -37,6 +37,19 @@ import uuid
 #     ]
 #"""
 
+class color:
+   PURPLE = '\033[95m'
+   CYAN = '\033[96m'
+   DARKCYAN = '\033[36m'
+   BLUE = '\033[94m'
+   GREEN = '\033[92m'
+   YELLOW = '\033[93m'
+   RED = '\033[91m'
+   BOLD = '\033[1m'
+   UNDERLINE = '\033[4m'
+   END = '\033[0m'
+
+
 class ProjectCzar:
     """ Provide interface to ~/czar/project-* files """
     ## datadir, curprjfile, listprjfile, curprjjson, listprjjson
@@ -181,15 +194,15 @@ class ProjectCzar:
         if showprj:
             self.aux_list(showprj)
 
-    def aux_list(self,prj):
+    def aux_list(self,prj,indent=''):
         (tasks, notes) = self.get_open_task(prj)
         tasks.reverse()
         idx = 1
         for t in tasks:
-            print('[',idx,']', ' '.join(t["notes"]),'.')
+            print(indent,'[%d]'%idx, ' '.join(t["notes"]),'.')
             if t["uuid"] in notes:
                 for n in notes[t["uuid"]]:
-                    print("    +   ", ' '.join(n["notes"]),'.')
+                    print(indent,"  + ", ' '.join(n["notes"]),'.')
             idx = idx + 1
 
     def cmd_done(self, idx, txt):
@@ -238,18 +251,21 @@ class ProjectCzar:
 
     def cmd_info(self):
         prj = self.which_project()
-        tell("Active Project: ", prj["project_directory"])
+        if prj:
+            tell("Active Project: ", prj["project_directory"])
 
     def cmd_pending(self):
         for x in self.listprjjson:
-            tell("===> ",x["project_directory"])
-            self.aux_list(x)
+            tell(">",color.BOLD,
+                 os.path.basename(x["project_directory"]),
+                 color.END)
+            self.aux_list(x,'   ')
 
 
 ################################################################################
 
 def tell(*args):
-    print(*["%s"%x for x in args], ';')
+    print(*["%s"%x for x in args])
 
 def cmd_help():
     tell(". Project - Czar Usage:")
@@ -259,8 +275,8 @@ def cmd_help():
     tell(".     -,stop    -- stop clock")
     tell(".     t,task    -- add a task to do")
     tell(".     l,list    -- list tasks")
-    tell(".     d,done    -- mark # task done")
-    tell(".     n,note    -- add note to # task")
+    tell(".     d,done    -- mark \# task done")
+    tell(".     n,note    -- add note to \# task")
     tell(".     p,pending -- show tasks of all projects")
 
 ###
